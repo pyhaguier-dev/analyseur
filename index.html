@@ -3507,7 +3507,7 @@ const amp = dataArray[i];
 if (amp > maxVolume) {
 maxVolume = amp;
 }
-if (amp > seuil) {
+if (amp > 0) {
 const exactFreq = i * sampleRate / analyser.fftSize;
 if (exactFreq > 0) {
 const key = Number(exactFreq.toFixed(2));
