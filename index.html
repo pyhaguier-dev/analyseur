@@ -67,38 +67,6 @@
             line-height: 1.4;
         }
 
-        .mic-panel {
-            margin-bottom: 15px;
-            background: rgba(15, 23, 42, 0.5);
-            padding: 12px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .mic-header {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.85rem;
-            margin-bottom: 6px;
-            color: #94a3b8;
-        }
-
-        .vu-container {
-            margin-top: 10px;
-            background: #0f172a;
-            height: 10px;
-            border-radius: 5px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        #vuMeterBar {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #10b981, #38bdf8, #ef4444);
-            transition: width 0.08s ease-out;
-        }
-
         .btn {
             width: 100%;
             padding: 16px 20px;
@@ -166,16 +134,6 @@
             border: 1px solid rgba(56, 189, 248, 0.2);
         }
 
-        .big-timer {
-            font-size: 2.8rem;
-            font-weight: 800;
-            text-align: center;
-            color: var(--success);
-            margin: 16px 0 4px 0;
-            font-variant-numeric: tabular-nums;
-            display: none;
-        }
-
         .results-card {
             margin-top: 20px;
             background: rgba(15, 23, 42, 0.5);
@@ -239,17 +197,18 @@
             <h1>Analyseur Rife CAFL</h1>
             <p class="subtitle">Placez le microphone sur le ventre et lancez une analyse acoustique de 10 secondes.</p>
         </header>
-
-        <div class="mic-panel">
-            <div class="mic-header">
-                <span>Gain visuel micro</span>
-                <span id="sensValue" style="color: #38bdf8; font-weight: bold;">75 %</span>
-            </div>
-            <input type="range" id="sensitivitySlider" min="1" max="100" value="75" style="width: 100%; accent-color: #38bdf8;">
-            <div class="vu-container">
-                <div id="vuMeterBar"></div>
-            </div>
-        </div>
+<div style="margin-bottom: 15px; background: rgba(15, 23, 42, 0.5); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; color: #94a3b8;">
+        <span>Sensibilité micro</span>
+        <span id="sensValue" style="color: #38bdf8; font-weight: bold;">75 %</span>
+    </div>
+    <input type="range" id="sensitivitySlider" min="1" max="100" value="75" style="width: 100%; accent-color: #38bdf8;">
+    
+    <!-- Barre de niveau sonore liée à la sensibilité -->
+    <div style="margin-top: 10px; background: #0f172a; height: 10px; border-radius: 5px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+        <div id="vuMeterBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #38bdf8, #ef4444); transition: width 0.08s ease-out;"></div>
+    </div>
+</div>
 
         <button id="startBtn" class="btn btn-primary">
             <span>🎙️ Démarrer l'analyse (10s)</span>
@@ -260,11 +219,10 @@
         </button>
 
         <div id="status" class="status-box">Prêt pour l'écoute</div>
-        <div id="bigTimer" class="big-timer">3:00</div>
 
         <div id="resultsCard" class="results-card">
             <div class="match-counter">
-                <span>Top 30 amplitudes hautes</span>
+                <span>Fréquences correspondantes</span>
                 <span id="matchCountBadge" class="badge">0</span>
             </div>
             <ul id="matchList" class="match-list"></ul>
@@ -272,6 +230,17 @@
     </div>
 
     <script>
+const vuMeterBar = document.getElementById('vuMeterBar');
+
+        // À ajouter avec tes variables en haut du script
+        const sensitivitySlider = document.getElementById('sensitivitySlider');
+        const sensValue = document.getElementById('sensValue');
+
+        sensitivitySlider.addEventListener('input', () => {
+    sensValue.innerText = sensitivitySlider.value + " %";
+});
+
+
         // =========================================================================
         // BASE DE DONNÉES CAFL (Collez votre base complète entre les accents graves)
         // =========================================================================
@@ -3395,19 +3364,15 @@ Zygomycosis (also called mucormycosis; a serious fungal infection usually associ
 `;
         // =========================================================================
 
-        const RECORD_DURATION = 10000;
-        const PLAYBACK_DURATION = 180;
+        const RECORD_DURATION = 10000;   // 10 secondes d'analyse
+        const PLAYBACK_DURATION = 180;   // 3 minutes (180 secondes) de diffusion max
 
         const startBtn = document.getElementById('startBtn');
         const playStopBtn = document.getElementById('playStopBtn');
         const statusDiv = document.getElementById('status');
-        const bigTimer = document.getElementById('bigTimer');
         const resultsCard = document.getElementById('resultsCard');
         const matchCountBadge = document.getElementById('matchCountBadge');
         const matchList = document.getElementById('matchList');
-        const sensitivitySlider = document.getElementById('sensitivitySlider');
-        const sensValue = document.getElementById('sensValue');
-        const vuMeterBar = document.getElementById('vuMeterBar');
 
         let matchedFrequenciesList = new Array();
         let playbackAudioCtx = null;
@@ -3416,81 +3381,71 @@ Zygomycosis (also called mucormycosis; a serious fungal infection usually associ
         let playbackTimeoutId = null;
         let playbackCountdownId = null;
 
-        sensitivitySlider.addEventListener('input', () => {
-            sensValue.innerText = sensitivitySlider.value + " %";
-        });
-
         function parseCaflText(rawText) {
             const db = {};
             const lines = rawText.split('\n');
+            
             lines.forEach(line => {
-const dashIndex = line.indexOf(' - ');
-if (dashIndex !== -1) {
-const name = line.substring(0, dashIndex).trim();
-const freqsPart = line.substring(dashIndex + 3);
-const freqs = freqsPart.split(',')
-.map(item => parseFloat(item.trim()))
-.filter(num => !isNaN(num));
-if (freqs.length > 0) {
-db[name] = freqs;
-}
-}
-});
-return db;
-}
-const CAFL_DATABASE = parseCaflText(DEFAULT_CAFL_DATA);
-function playEndBeep() {
-try {
-const beepCtx = new (window.AudioContext || window.webkitAudioContext)();
-const osc = beepCtx.createOscillator();
-const gain = beepCtx.createGain();
-osc.type = 'sine';
-osc.frequency.setValueAtTime(880, beepCtx.currentTime);
-gain.gain.setValueAtTime(0.15, beepCtx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.001, beepCtx.currentTime + 0.25);
-osc.connect(gain);
-gain.connect(beepCtx.destination);
-osc.start();
-osc.stop(beepCtx.currentTime + 0.25);
-setTimeout(() => beepCtx.close(), 300);
-} catch (e) {}
-}
-startBtn.addEventListener('click', async () => {
-if (isPlaying) {
-stopPlayback("Diffusion arrêtée");
-}
-if (Object.keys(CAFL_DATABASE).length === 0) {
-statusDiv.innerText = "Erreur : La base CAFL dans le script est vide.";
-return;
-}
-startBtn.disabled = true;
-playStopBtn.style.display = 'none';
-resultsCard.style.display = 'none';
-matchedFrequenciesList = new Array();
-statusDiv.innerText = "Activation du microphone...";
-try {
-const stream = await navigator.mediaDevices.getUserMedia({
-audio: {
-echoCancellation: false,
-noiseSuppression: false,
-autoGainControl: false
-}
-});
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-if (audioCtx.state === 'suspended') {
-await audioCtx.resume();
-}
-const source = audioCtx.createMediaStreamSource(stream);
-const micGain = audioCtx.createGain();
-micGain.gain.value = 3.0;
-const analyser = audioCtx.createAnalyser();
-analyser.fftSize = 16384;
-source.connect(micGain);
-micGain.connect(analyser);
-const bufferLength = analyser.frequencyBinCount;
-const dataArray = new Uint8Array(bufferLength);
-const sampleRate = audioCtx.sampleRate;
-let detectedFrequenciesMap = new Map();
+                const dashIndex = line.indexOf(' - ');
+                if (dashIndex !== -1) {
+                    const name = line.substring(0, dashIndex).trim();
+                    const freqsPart = line.substring(dashIndex + 3);
+                    const freqs = freqsPart.split(',')
+                        .map(item => parseFloat(item.trim()))
+                        .filter(num => !isNaN(num));
+                        
+                    if (freqs.length > 0) {
+                        db[name] = freqs;
+                    }
+                }
+            });
+            return db;
+        }
+
+        const CAFL_DATABASE = parseCaflText(DEFAULT_CAFL_DATA);
+
+        startBtn.addEventListener('click', async () => {
+            if (isPlaying) {
+                stopPlayback("Diffusion arrêtée");
+            }
+
+            if (Object.keys(CAFL_DATABASE).length === 0) {
+                statusDiv.innerText = "Erreur : La base CAFL dans le script est vide.";
+                return;
+            }
+
+            startBtn.disabled = true;
+            playStopBtn.style.display = 'none';
+            resultsCard.style.display = 'none';
+            matchedFrequenciesList = new Array();
+            statusDiv.innerText = "Activation du microphone...";
+            
+            try {
+                               const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                });
+
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioCtx.createMediaStreamSource(stream);
+                const analyser = audioCtx.createAnalyser();
+                
+                analyser.fftSize = 16384; 
+                              // Amplifie le signal du micro par 3 pour capter les sons faibles du ventre
+                const micGain = audioCtx.createGain();
+                micGain.gain.value = 3.0; 
+                source.connect(micGain);
+                micGain.connect(analyser);
+
+                
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                const sampleRate = audioCtx.sampleRate;
+                
+let detectedFrequencies = new Set();
 let secondsLeft = 10;
 statusDiv.innerText = "Écoute en cours... " + secondsLeft + "s";
 const countdownId = setInterval(() => {
@@ -3499,105 +3454,98 @@ if (secondsLeft > 0) {
 statusDiv.innerText = "Écoute en cours... " + secondsLeft + "s";
 }
 }, 1000);
-const intervalId = setInterval(() => {
-analyser.getByteFrequencyData(dataArray);
-const sensPercent = Number(sensitivitySlider.value);
-const visualGain = sensPercent / 20;
-let maxVolume = 0;
-for (let i = 0; i < bufferLength; i++) {
-const amp = dataArray[i];
-if (amp > maxVolume) {
-maxVolume = amp;
-}
-if (amp > 0) {
-const exactFreq = i * sampleRate / analyser.fftSize;
-if (exactFreq > 0) {
-const key = Number(exactFreq.toFixed(2));
-if (!detectedFrequenciesMap.has(key) || amp > detectedFrequenciesMap.get(key)) {
-detectedFrequenciesMap.set(key, amp);
-}
-}
-}
-}
-const adjustedVolume = maxVolume * visualGain;
-const percent = Math.min(100, Math.round((adjustedVolume / 255) * 100));
-vuMeterBar.style.width = percent + "%";
+                // C'EST CE SETINTERVAL (celui à 100 ms) :
+             const intervalId = setInterval(() => {
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Plus le curseur est haut (1 à 100), plus le seuil de détection est bas (sensible)
+    const sensPercent = Number(sensitivitySlider.value);
+    const seuil = Math.round(160 - (sensPercent * 1.5)); // Va de 158 (peu sensible) à 10 (très sensible)
+    
+    // Facteur d'amplification visuelle pour la barre (de x0.5 à x5)
+    const visualGain = sensPercent / 20; 
+    let maxVolume = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+        if (dataArray[i] > maxVolume) {
+            maxVolume = dataArray[i];
+        }
+
+        if (dataArray[i] > seuil) { 
+            const exactFreq = i * sampleRate / analyser.fftSize;
+            if (exactFreq > 0) {
+                detectedFrequencies.add(Number(exactFreq.toFixed(2)));
+                detectedFrequencies.add(Math.floor(exactFreq));
+                detectedFrequencies.add(Math.ceil(exactFreq));
+            }
+        }
+    }
+
+    // La barre évolue maintenant proportionnellement à ta sensibilité
+    const adjustedVolume = maxVolume * visualGain;
+    const percent = Math.min(100, Math.round((adjustedVolume / 255) * 100));
+    vuMeterBar.style.width = percent + "%";
 }, 100);
-setTimeout(() => {
-clearInterval(intervalId);
-clearInterval(countdownId);
-vuMeterBar.style.width = "0%";
-stream.getTracks().forEach(track => track.stop());
-audioCtx.close();
-playEndBeep();
-statusDiv.innerText = "Analyse terminée";
-comparerFrequences(detectedFrequenciesMap);
-startBtn.disabled = false;
-}, RECORD_DURATION);
+
+
+                setTimeout(() => {
+                    clearInterval(intervalId);
+                    vuMeterBar.style.width = "0%";
+
+                    clearInterval(countdownId);
+                    stream.getTracks().forEach(track => track.stop());
+                    audioCtx.close();
+                    
+                    playEndBeep(); // Petit bip de fin d'analyse
+                    statusDiv.innerText = "Analyse terminée";
+                    comparerFrequences(Array.from(detectedFrequencies));
+                    startBtn.disabled = false;
+                }, RECORD_DURATION);
+
 } catch (err) {
-vuMeterBar.style.width = "0%";
 statusDiv.innerText = "Accès micro refusé ou HTTPS requis.";
 startBtn.disabled = false;
 }
 });
-function comparerFrequences(recordedMap) {
-let lookupMap = new Map();
-recordedMap.forEach((amp, freq) => {
-const variants = new Array(freq, Math.floor(freq), Math.ceil(freq));
-variants.forEach(v => {
-if (!lookupMap.has(v) || amp > lookupMap.get(v)) {
-lookupMap.set(v, amp);
-}
-});
-});
-let matchedCaflFreqsMap = new Map();
-let pathoToCaflFreqs = new Map();
+function comparerFrequences(recordedFreqs) {
+let matchesFound = new Array();
+let matchedNames = new Array();
 for (const [pathologie, caflFreqs] of Object.entries(CAFL_DATABASE)) {
-let matchedForThisPatho = new Array();
+let hasMatchForThisPatho = false;
 caflFreqs.forEach(cFreq => {
-const variants = new Array(Number(cFreq.toFixed(2)), Math.floor(cFreq), Math.ceil(cFreq));
-let maxAmpForThisFreq = -Infinity;
-variants.forEach(v => {
-if (lookupMap.has(v) && lookupMap.get(v) > maxAmpForThisFreq) {
-maxAmpForThisFreq = lookupMap.get(v);
+const cFreqExact = Number(cFreq.toFixed(2));
+const cFreqFloor = Math.floor(cFreq);
+const cFreqCeil = Math.ceil(cFreq);
+const isMatch = recordedFreqs.includes(cFreqExact) ||
+recordedFreqs.includes(cFreqFloor) ||
+recordedFreqs.includes(cFreqCeil);
+if (isMatch) {
+hasMatchForThisPatho = true;
+if (!matchesFound.includes(cFreq)) {
+matchesFound.push(cFreq);
+}
 }
 });
-if (maxAmpForThisFreq !== -Infinity) {
-matchedForThisPatho.push(cFreq);
-if (!matchedCaflFreqsMap.has(cFreq) || maxAmpForThisFreq > matchedCaflFreqsMap.get(cFreq)) {
-matchedCaflFreqsMap.set(cFreq, maxAmpForThisFreq);
+if (hasMatchForThisPatho) {
+matchedNames.push(pathologie.replace(/_/g, ' '));
 }
 }
-});
-if (matchedForThisPatho.length > 0) {
-pathoToCaflFreqs.set(pathologie.replace(/_/g, ' '), matchedForThisPatho);
-}
-}
-const top30Entries = Array.from(matchedCaflFreqsMap.entries())
-.sort((a, b) => b[1] - a[1])
-.slice(0, 30);
-const top30Freqs = top30Entries.map(entry => entry[0]);
-let finalMatchedNames = new Array();
-pathoToCaflFreqs.forEach((freqs, cleanName) => {
-if (freqs.some(f => top30Freqs.includes(f))) {
-finalMatchedNames.push(cleanName);
-}
-});
 resultsCard.style.display = 'block';
-matchCountBadge.innerText = top30Freqs.length;
+matchCountBadge.innerText = matchesFound.length;
 matchList.innerHTML = '';
-if (top30Freqs.length === 0) {
+if (matchesFound.length === 0) {
 matchList.innerHTML = 'Aucune correspondance détectée.';
 return;
 }
-matchedFrequenciesList = top30Freqs;
-finalMatchedNames.forEach(name => {
+matchedFrequenciesList = matchesFound;
+matchedNames.forEach(name => {
 const li = document.createElement('li');
 li.innerText = name;
 matchList.appendChild(li);
 });
 playStopBtn.style.display = 'flex';
 }
+// Formate les secondes en MM:SS
 function formatTime(totalSeconds) {
 const minutes = Math.floor(totalSeconds / 60);
 const seconds = totalSeconds % 60;
@@ -3627,18 +3575,18 @@ activeOscillators.push(osc);
 });
 isPlaying = true;
 let remainingTime = PLAYBACK_DURATION;
-bigTimer.style.display = 'block';
-bigTimer.innerText = formatTime(remainingTime);
 playStopBtn.innerHTML = "⏹️ Arrêter (" + formatTime(remainingTime) + ")";
 playStopBtn.classList.add('playing');
-statusDiv.innerText = "Diffusion Rife active";
+statusDiv.innerText = "Diffusion Rife active (arrêt auto dans " + formatTime(remainingTime) + ")";
+// Décompte chaque seconde sur le bouton et le statut
 playbackCountdownId = setInterval(() => {
 remainingTime--;
 if (remainingTime > 0) {
-bigTimer.innerText = formatTime(remainingTime);
 playStopBtn.innerHTML = "⏹️ Arrêter (" + formatTime(remainingTime) + ")";
+statusDiv.innerText = "Diffusion Rife active (arrêt auto dans " + formatTime(remainingTime) + ")";
 }
 }, 1000);
+// Arrêt automatique après 3 minutes (180 000 ms)
 playbackTimeoutId = setTimeout(() => {
 stopPlayback("Diffusion terminée (3 minutes écoulées)");
 }, PLAYBACK_DURATION * 1000);
@@ -3660,12 +3608,10 @@ playbackAudioCtx.close();
 playbackAudioCtx = null;
 }
 isPlaying = false;
-bigTimer.style.display = 'none';
 playStopBtn.innerHTML = "▶️ Diffuser les fréquences (3 min)";
 playStopBtn.classList.remove('playing');
 statusDiv.innerText = statusMessage || "Diffusion arrêtée";
 }
-
          // Génère un petit bip doux à la fin de l'analyse
         function playEndBeep() {
             try {
