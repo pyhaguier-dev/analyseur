@@ -242,7 +242,7 @@
 
         <div class="mic-panel">
             <div class="mic-header">
-                <span>Sensibilité micro</span>
+                <span>Gain visuel micro</span>
                 <span id="sensValue" style="color: #38bdf8; font-weight: bold;">75 %</span>
             </div>
             <input type="range" id="sensitivitySlider" min="1" max="100" value="75" style="width: 100%; accent-color: #38bdf8;">
@@ -264,7 +264,7 @@
 
         <div id="resultsCard" class="results-card">
             <div class="match-counter">
-                <span>Fréquences correspondantes (max 30)</span>
+                <span>Top 30 amplitudes hautes</span>
                 <span id="matchCountBadge" class="badge">0</span>
             </div>
             <ul id="matchList" class="match-list"></ul>
@@ -276,6 +276,8 @@
         // BASE DE DONNÉES CAFL (Collez votre base complète entre les accents graves)
         // =========================================================================
         const DEFAULT_CAFL_DATA = `
+
+
 Abdominal_inflammation - 2720, 2489, 2170, 2000, 1865, 1800, 1600, 1550, 880, 832, 802, 787, 776, 727, 660, 465, 450, 444, 440, 428, 380, 250, 146, 125, 95, 72, 20, 1.2
 
 Abdominal_pain - 10000, 3000, 95, 3
@@ -3389,11 +3391,12 @@ Yersenia_pestis_1 - 337.6
 Zearalenone_HC - 4978.71, 247.88
 
 Zygomycosis (also called mucormycosis; a serious fungal infection usually associated with uncontrolled diabetes mellitus or immunosuppressive drugs) - 942, 623, 733
+
 `;
         // =========================================================================
 
-        const RECORD_DURATION = 10000;   // 10 secondes d'analyse
-        const PLAYBACK_DURATION = 180;   // 3 minutes de diffusion
+        const RECORD_DURATION = 10000;
+        const PLAYBACK_DURATION = 180;
 
         const startBtn = document.getElementById('startBtn');
         const playStopBtn = document.getElementById('playStopBtn');
@@ -3419,8 +3422,8 @@ Zygomycosis (also called mucormycosis; a serious fungal infection usually associ
 
         function parseCaflText(rawText) {
             const db = {};
-const lines = rawText.split('\n');
-lines.forEach(line => {
+            const lines = rawText.split('\n');
+            lines.forEach(line => {
 const dashIndex = line.indexOf(' - ');
 if (dashIndex !== -1) {
 const name = line.substring(0, dashIndex).trim();
@@ -3452,7 +3455,6 @@ osc.stop(beepCtx.currentTime + 0.25);
 setTimeout(() => beepCtx.close(), 300);
 } catch (e) {}
 }
-// Lancement de l'enregistrement au clic uniquement
 startBtn.addEventListener('click', async () => {
 if (isPlaying) {
 stopPlayback("Diffusion arrêtée");
@@ -3475,8 +3477,10 @@ autoGainControl: false
 }
 });
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+if (audioCtx.state === 'suspended') {
+await audioCtx.resume();
+}
 const source = audioCtx.createMediaStreamSource(stream);
-// Amplification x3 pour capter les sons faibles du ventre
 const micGain = audioCtx.createGain();
 micGain.gain.value = 3.0;
 const analyser = audioCtx.createAnalyser();
@@ -3486,7 +3490,6 @@ micGain.connect(analyser);
 const bufferLength = analyser.frequencyBinCount;
 const dataArray = new Uint8Array(bufferLength);
 const sampleRate = audioCtx.sampleRate;
-// Map : fréquence exacte -> amplitude minimale détectée
 let detectedFrequenciesMap = new Map();
 let secondsLeft = 10;
 statusDiv.innerText = "Écoute en cours... " + secondsLeft + "s";
@@ -3499,7 +3502,6 @@ statusDiv.innerText = "Écoute en cours... " + secondsLeft + "s";
 const intervalId = setInterval(() => {
 analyser.getByteFrequencyData(dataArray);
 const sensPercent = Number(sensitivitySlider.value);
-const seuil = Math.round(160 - (sensPercent * 1.5));
 const visualGain = sensPercent / 20;
 let maxVolume = 0;
 for (let i = 0; i < bufferLength; i++) {
@@ -3511,7 +3513,7 @@ if (amp > 0) {
 const exactFreq = i * sampleRate / analyser.fftSize;
 if (exactFreq > 0) {
 const key = Number(exactFreq.toFixed(2));
-if (!detectedFrequenciesMap.has(key) || amp < detectedFrequenciesMap.get(key)) {
+if (!detectedFrequenciesMap.has(key) || amp > detectedFrequenciesMap.get(key)) {
 detectedFrequenciesMap.set(key, amp);
 }
 }
@@ -3538,13 +3540,12 @@ statusDiv.innerText = "Accès micro refusé ou HTTPS requis.";
 startBtn.disabled = false;
 }
 });
-// Comparaison et sélection des 30 fréquences CAFL aux plus basses amplitudes
 function comparerFrequences(recordedMap) {
 let lookupMap = new Map();
 recordedMap.forEach((amp, freq) => {
-const variants = [freq, Math.floor(freq), Math.ceil(freq)];
+const variants = new Array(freq, Math.floor(freq), Math.ceil(freq));
 variants.forEach(v => {
-if (!lookupMap.has(v) || amp < lookupMap.get(v)) {
+if (!lookupMap.has(v) || amp > lookupMap.get(v)) {
 lookupMap.set(v, amp);
 }
 });
@@ -3554,17 +3555,17 @@ let pathoToCaflFreqs = new Map();
 for (const [pathologie, caflFreqs] of Object.entries(CAFL_DATABASE)) {
 let matchedForThisPatho = new Array();
 caflFreqs.forEach(cFreq => {
-const variants = [Number(cFreq.toFixed(2)), Math.floor(cFreq), Math.ceil(cFreq)];
-let minAmpForThisFreq = Infinity;
+const variants = new Array(Number(cFreq.toFixed(2)), Math.floor(cFreq), Math.ceil(cFreq));
+let maxAmpForThisFreq = -Infinity;
 variants.forEach(v => {
-if (lookupMap.has(v) && lookupMap.get(v) < minAmpForThisFreq) {
-minAmpForThisFreq = lookupMap.get(v);
+if (lookupMap.has(v) && lookupMap.get(v) > maxAmpForThisFreq) {
+maxAmpForThisFreq = lookupMap.get(v);
 }
 });
-if (minAmpForThisFreq !== Infinity) {
+if (maxAmpForThisFreq !== -Infinity) {
 matchedForThisPatho.push(cFreq);
-if (!matchedCaflFreqsMap.has(cFreq) || minAmpForThisFreq < matchedCaflFreqsMap.get(cFreq)) {
-matchedCaflFreqsMap.set(cFreq, minAmpForThisFreq);
+if (!matchedCaflFreqsMap.has(cFreq) || maxAmpForThisFreq > matchedCaflFreqsMap.get(cFreq)) {
+matchedCaflFreqsMap.set(cFreq, maxAmpForThisFreq);
 }
 }
 });
@@ -3572,12 +3573,10 @@ if (matchedForThisPatho.length > 0) {
 pathoToCaflFreqs.set(pathologie.replace(/_/g, ' '), matchedForThisPatho);
 }
 }
-// Tri par amplitude croissante et limitation stricte à 30 fréquences CAFL
 const top30Entries = Array.from(matchedCaflFreqsMap.entries())
-.sort((a, b) => a[1] - b[1])
+.sort((a, b) => b[1] - a[1])
 .slice(0, 30);
 const top30Freqs = top30Entries.map(entry => entry[0]);
-// Ne conserve que les pathologies ayant au moins une fréquence dans le Top 30
 let finalMatchedNames = new Array();
 pathoToCaflFreqs.forEach((freqs, cleanName) => {
 if (freqs.some(f => top30Freqs.includes(f))) {
@@ -3666,7 +3665,8 @@ playStopBtn.innerHTML = "▶️ Diffuser les fréquences (3 min)";
 playStopBtn.classList.remove('playing');
 statusDiv.innerText = statusMessage || "Diffusion arrêtée";
 }
-   // Génère un petit bip doux à la fin de l'analyse
+
+         // Génère un petit bip doux à la fin de l'analyse
         function playEndBeep() {
             try {
                 const beepCtx = new (window.AudioContext || window.webkitAudioContext)();
