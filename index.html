@@ -3558,21 +3558,57 @@ startPlayback();
 stopPlayback("Diffusion arrêtée manuellement");
 }
 });
-function startPlayback() {
-if (matchedFrequenciesList.length === 0) return;
-playbackAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-const masterGain = playbackAudioCtx.createGain();
-masterGain.gain.value = 0.5 / matchedFrequenciesList.length;
-masterGain.connect(playbackAudioCtx.destination);
-activeOscillators = new Array();
-matchedFrequenciesList.forEach(freq => {
-const osc = playbackAudioCtx.createOscillator();
-osc.type = 'square';
-osc.frequency.setValueAtTime(freq, playbackAudioCtx.currentTime);
-osc.connect(masterGain);
-osc.start();
-activeOscillators.push(osc);
-});
+   function startPlayback() {
+            if (matchedFrequenciesList.length === 0) return;
+
+            playbackAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            // 1. Limiteur / Compresseur anti-saturation en sortie
+            const compressor = playbackAudioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-12, playbackAudioCtx.currentTime);
+            compressor.knee.setValueAtTime(10, playbackAudioCtx.currentTime);
+            compressor.ratio.setValueAtTime(12, playbackAudioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.005, playbackAudioCtx.currentTime);
+            compressor.release.setValueAtTime(0.1, playbackAudioCtx.currentTime);
+            compressor.connect(playbackAudioCtx.destination);
+
+            // 2. Volume général sécurisé
+            const masterGain = playbackAudioCtx.createGain();
+            masterGain.gain.value = 0.8 / Math.sqrt(matchedFrequenciesList.length);
+            masterGain.connect(compressor);
+
+            activeOscillators = new Array();
+
+            matchedFrequenciesList.forEach(freq => {
+                const osc = playbackAudioCtx.createOscillator();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(freq, playbackAudioCtx.currentTime);
+
+                // 3. Égalisation individuelle du volume selon la fréquence
+                const freqGain = playbackAudioCtx.createGain();
+                let weight = 1.0;
+
+                if (freq < 60) {
+                    weight = 2.8;  // Fort boost pour les très basses fréquences
+                } else if (freq < 150) {
+                    weight = 2.2;  // Boost important pour les graves
+                } else if (freq < 400) {
+                    weight = 1.5;  // Léger boost pour les bas-médiums
+                } else if (freq >= 1000 && freq <= 5000) {
+                    weight = 0.45; // Atténuation de la zone la plus sensible de l'oreille
+                } else if (freq > 5000) {
+                    weight = 0.6;  // Atténuation des hautes fréquences
+                }
+
+                freqGain.gain.setValueAtTime(weight, playbackAudioCtx.currentTime);
+
+                // Chaînage : Oscillateur -> Gain individuel -> MasterGain -> Compresseur -> Sortie
+                osc.connect(freqGain);
+                freqGain.connect(masterGain);
+
+                osc.start();
+                activeOscillators.push(osc);
+            });
 isPlaying = true;
 let remainingTime = PLAYBACK_DURATION;
 playStopBtn.innerHTML = "⏹️ Arrêter (" + formatTime(remainingTime) + ")";
