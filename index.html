@@ -3436,7 +3436,7 @@ Zygomycosis (also called mucormycosis; a serious fungal infection usually associ
                 analyser.fftSize = 16384; 
                               // Amplifie le signal du micro par 3 pour capter les sons faibles du ventre
                 const micGain = audioCtx.createGain();
-                micGain.gain.value = 3.0; 
+             micGain.gain.value = Number(sensitivitySlider.value) / 10; // Va de x0.1 à x10
                 source.connect(micGain);
                 micGain.connect(analyser);
 
@@ -3459,7 +3459,9 @@ statusDiv.innerText = "Écoute en cours... " + secondsLeft + "s";
     analyser.getByteFrequencyData(dataArray);
     
     // Plus le curseur est haut (1 à 100), plus le seuil de détection est bas (sensible)
+
     const sensPercent = Number(sensitivitySlider.value);
+micGain.gain.setValueAtTime(sensPercent / 10, audioCtx.currentTime);
     const seuil = Math.round(160 - (sensPercent * 1.5)); // Va de 158 (peu sensible) à 10 (très sensible)
     
     // Facteur d'amplification visuelle pour la barre (de x0.5 à x5)
