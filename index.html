@@ -194,8 +194,8 @@
 
     <div class="container">
         <header>
-            <h1>Analyseur Rife CAFL</h1>
-            <p class="subtitle">Placez le microphone sur le ventre et lancez une analyse acoustique de 10 secondes.</p>
+            <h1>Analyseur et traitement du corps</h1>
+            <p class="subtitle">Placez le microphone sur le ventre et appuyez sur "Démarrer l'analyse", la durée est de 10 secondes.</p>
         </header>
 <div style="margin-bottom: 15px; background: rgba(15, 23, 42, 0.5); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
     <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; color: #94a3b8;">
@@ -215,7 +215,7 @@
         </button>
 
         <button id="playStopBtn" class="btn btn-play">
-            <span>▶️ Diffuser les fréquences (3 min)</span>
+            <span>▶️ Diffuser les fréquences (10 min)</span>
         </button>
 
         <div id="status" class="status-box">Prêt pour l'écoute</div>
@@ -3365,7 +3365,7 @@ Zygomycosis (also called mucormycosis; a serious fungal infection usually associ
         // =========================================================================
 
         const RECORD_DURATION = 10000;   // 10 secondes d'analyse
-        const PLAYBACK_DURATION = 180;   // 3 minutes (180 secondes) de diffusion max
+        const PLAYBACK_DURATION = 600;   // 3 minutes (180 secondes) de diffusion max
 
         const startBtn = document.getElementById('startBtn');
         const playStopBtn = document.getElementById('playStopBtn');
@@ -3624,7 +3624,7 @@ statusDiv.innerText = "Diffusion Rife active (arrêt auto dans " + formatTime(re
 }, 1000);
 // Arrêt automatique après 3 minutes (180 000 ms)
 playbackTimeoutId = setTimeout(() => {
-stopPlayback("Diffusion terminée (3 minutes écoulées)");
+stopPlayback("Diffusion terminée (10 minutes écoulées)");
 }, PLAYBACK_DURATION * 1000);
 }
 function stopPlayback(statusMessage) {
@@ -3644,7 +3644,7 @@ playbackAudioCtx.close();
 playbackAudioCtx = null;
 }
 isPlaying = false;
-playStopBtn.innerHTML = "▶️ Diffuser les fréquences (3 min)";
+playStopBtn.innerHTML = "▶️ Diffuser les fréquences (10 min)";
 playStopBtn.classList.remove('playing');
 statusDiv.innerText = statusMessage || "Diffusion arrêtée";
 }
